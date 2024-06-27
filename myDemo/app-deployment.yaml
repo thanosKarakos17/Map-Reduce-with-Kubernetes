@@ -1,0 +1,79 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: flask-app
+  namespace: alpha
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: flask-app
+  template:
+    metadata:
+      labels:
+        app: flask-app
+    spec:
+      serviceAccountName: flask-app-sa
+      containers:
+      - name: flask-app
+        image: thkarakos/flask-app:latest
+        ports:
+        - containerPort: 5000
+        env:
+        - name: UPLOAD_FOLDER
+          value: /app/uploads
+        - name: PROCESSED_FOLDER
+          value: /app/processed
+        volumeMounts:
+        - name: upload-storage
+          mountPath: /app/uploads
+        - name: processed-storage
+          mountPath: /app/processed
+      volumes:
+      - name: upload-storage
+        emptyDir: {}
+      - name: processed-storage
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: flask-app
+  namespace: alpha
+spec:
+  type: NodePort
+  ports:
+    - port: 5000
+      targetPort: 5000
+  selector:
+    app: flask-app
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: flask-app-sa
+  namespace: alpha
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: flask-app-role
+  namespace: alpha
+rules:
+- apiGroups: [""]
+  resources: ["pods", "pods/exec", "pods/log", "services"]
+  verbs: ["get", "list", "create", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: flask-app-rolebinding
+  namespace: alpha
+subjects:
+- kind: ServiceAccount
+  name: flask-app-sa
+  namespace: alpha
+roleRef:
+  kind: Role
+  name: flask-app-role
+  apiGroup: rbac.authorization.k8s.io
